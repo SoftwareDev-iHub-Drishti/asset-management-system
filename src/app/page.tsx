@@ -5,7 +5,9 @@ import { getUniqueAssetNames, getAssetDetailsByName, submitAssetLog, getCheckedO
 import { Loader2, CheckCircle2, AlertCircle, FileText, X, ClipboardList } from "lucide-react";
 import Link from "next/link";
 import { createBrowserClient } from '@supabase/ssr';
-
+import OverviewTable from "@/components/OverviewTable";
+import OverviewCardList from "@/components/OverviewCardList";
+import SearchableDropdown from "@/components/SearchableDropdown";
 
 type AssetData = { id: string; availableQuantity: number; totalQuantity: number };
 type Summary = { available: number; total: number };
@@ -13,11 +15,9 @@ type Summary = { available: number; total: number };
 export default function AssetManagementForm() {
   const [assetNames, setAssetNames] = useState<string[]>([]);
   const [loadingNames, setLoadingNames] = useState(true);
-  
-  // The user MUST select an action first now
+
   const [action, setAction] = useState<"CHECK_OUT" | "CHECK_IN" | "">("");
 
-  // Asset Entries state
   const [entries, setEntries] = useState([
     { name: "", id: "", options: [] as AssetData[], summary: null as Summary | null, loading: false },
     { name: "", id: "", options: [] as AssetData[], summary: null as Summary | null, loading: false },
@@ -32,25 +32,21 @@ export default function AssetManagementForm() {
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
 
-  // Overview Modal State
   const [showOverview, setShowOverview] = useState(false);
   const [overviewData, setOverviewData] = useState<any[]>([]);
   const [loadingOverview, setLoadingOverview] = useState(false);
 
-  // Supabase client initialization
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  // AUTHENTICATION CHECK
   useEffect(() => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         window.location.href = '/login';
       } else {
-        // Pre-fill fields but leave them editable as requested
         setIssuedTo(user.user_metadata.full_name || "");
         setEmailAddress(user.email || "");
       }
@@ -58,7 +54,6 @@ export default function AssetManagementForm() {
     checkUser();
   }, [supabase]);
 
-  // Fetch unique asset names on component mount
   useEffect(() => {
     async function fetchNames() {
       const res = await getUniqueAssetNames();
@@ -71,7 +66,7 @@ export default function AssetManagementForm() {
   const handleNameChange = async (index: number, newName: string) => {
     const newEntries = [...entries];
     newEntries[index].name = newName;
-    newEntries[index].id = ""; 
+    newEntries[index].id = "";
     newEntries[index].options = [];
     newEntries[index].summary = null;
     newEntries[index].loading = true;
@@ -132,28 +127,28 @@ export default function AssetManagementForm() {
   return (
     <div className="min-h-screen bg-gray-100 flex items-start justify-center p-4 sm:p-8 font-sans text-gray-800">
       <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-2xl border border-gray-200 relative">
-        
-       {/* System Logs Button */}
-        <Link 
-          href="/logs"
-          className="absolute top-6 left-6 flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-gray-800 bg-gray-100 px-3 py-1.5 rounded-full transition-colors"
-        >
-          <ClipboardList className="w-4 h-4" /> System Logs
-        </Link>
 
-        {/* Live Overview Button */}
-        <button 
-          onClick={fetchOverview}
-          type="button"
-          className="absolute top-6 right-6 flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 px-3 py-1.5 rounded-full transition-colors"
-        >
-          <FileText className="w-4 h-4" /> Live Overview
-        </button>
+        {/* Header row: buttons stack above title on mobile, sit beside it on larger screens */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
+          <Link
+            href="/logs"
+            className="flex items-center justify-center gap-2 text-sm font-semibold text-gray-600 hover:text-gray-800 bg-gray-100 px-3 py-1.5 rounded-full transition-colors order-2 sm:order-1"
+          >
+            <ClipboardList className="w-4 h-4" /> System Logs
+          </Link>
 
-        <h2 className="text-2xl font-bold text-center text-blue-600 mb-8 mt-2">Asset Management</h2>
+          <h2 className="text-2xl font-bold text-center text-blue-600 order-1 sm:order-2">Asset Management</h2>
 
+          <button
+            onClick={fetchOverview}
+            type="button"
+            className="flex items-center justify-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 px-3 py-1.5 rounded-full transition-colors order-3"
+          >
+            <FileText className="w-4 h-4" /> Live Overview
+          </button>
+        </div>
         <form onSubmit={handleSubmit} className="space-y-6">
-          
+
           {/* STEP 1: Select Action First */}
           <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
             <label className="block text-sm font-bold text-blue-800 mb-2">1. What do you want to do? *</label>
@@ -185,23 +180,17 @@ export default function AssetManagementForm() {
                       </span>
                     )}
                   </div>
-                  
+
                   <div className="flex flex-col sm:flex-row gap-4">
                     <div className="flex-1">
                       <label className="block text-xs font-medium text-gray-500 mb-1">Asset Name</label>
-                      <input
-                        type="text"
-                        list={`asset-names-${index}`}
+                      <SearchableDropdown
+                        options={assetNames}
                         value={entry.name}
-                        onChange={(e) => handleNameChange(index, e.target.value)}
+                        onChange={(newName) => handleNameChange(index, newName)}
                         placeholder={loadingNames ? "Loading..." : "Search name..."}
                         disabled={loadingNames}
-                        required={isRequired}
-                        className="w-full p-2 border border-gray-300 rounded-md outline-none"
                       />
-                      <datalist id={`asset-names-${index}`}>
-                        {assetNames.map(name => <option key={name} value={name} />)}
-                      </datalist>
                     </div>
 
                     <div className="flex-1">
@@ -219,7 +208,6 @@ export default function AssetManagementForm() {
                       >
                         <option value="" disabled>{entry.loading ? "Loading..." : "Select ID"}</option>
                         {entry.options.map(opt => {
-                          // SMART LOGIC: Disable IDs based on the action selected
                           const isAvailable = opt.availableQuantity > 0;
                           const isDisabled = action === "CHECK_OUT" ? !isAvailable : isAvailable;
                           const statusText = isAvailable ? "(In Almirah)" : "(Currently Out)";
@@ -275,40 +263,17 @@ export default function AssetManagementForm() {
               <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2"><FileText className="text-blue-600"/> Assets Currently Out</h3>
               <button onClick={() => setShowOverview(false)} className="text-gray-500 hover:text-red-500"><X className="w-6 h-6" /></button>
             </div>
-            
+
             <div className="p-6 overflow-y-auto">
               {loadingOverview ? (
                 <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>
               ) : overviewData.length === 0 ? (
                 <div className="text-center py-10 text-gray-500">All assets are currently in the Almirah!</div>
               ) : (
-                <div className="overflow-x-auto rounded-lg border border-gray-200">
-                  <table className="w-full text-left text-sm text-gray-600">
-                    <thead className="bg-gray-100 text-gray-800 font-semibold">
-                      <tr>
-                        <th className="px-4 py-3 border-b">ID</th>
-                        <th className="px-4 py-3 border-b">Name</th>
-                        <th className="px-4 py-3 border-b">Issued To</th>
-                        <th className="px-4 py-3 border-b">Issued By</th>
-                        <th className="px-4 py-3 border-b">Date Out</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {overviewData.map((asset) => {
-                        const lastLog = asset.logs[0]; // The most recent log
-                        return (
-                          <tr key={asset.id} className="border-b last:border-0 hover:bg-gray-50 transition-colors">
-                            <td className="px-4 py-3 font-medium text-gray-900">{asset.id}</td>
-                            <td className="px-4 py-3">{asset.name}</td>
-                            <td className="px-4 py-3 font-medium text-blue-600">{lastLog?.issuedTo || "Unknown"}</td>
-                            <td className="px-4 py-3">{lastLog?.issuedBy || "-"}</td>
-                            <td className="px-4 py-3">{lastLog ? new Date(lastLog.createdAt).toLocaleDateString() : "-"}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                <>
+                  <OverviewTable overviewData={overviewData} />
+                  <OverviewCardList overviewData={overviewData} />
+                </>
               )}
             </div>
           </div>

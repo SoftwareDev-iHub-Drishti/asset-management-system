@@ -46,13 +46,22 @@ const html = `
     <p style="margin:4px 0;"><strong>Action:</strong> ${actionLabel}</p>
     <p style="margin:4px 0;"><strong>Issued By:</strong> ${issuedBy}</p>
     <p style="margin-top:24px;color:#6b7280;">Thank you for using the Asset Management System.</p>
+    <p style="margin-top:16px;padding-top:16px;border-top:1px solid #e5e7eb;color:#9ca3af;font-size:12px;">
+        This is an automated message sent from an unmonitored mailbox. Please do not reply to this email.
+    </p>
     </div>
 `;
 
-await resend.emails.send({
+const result = await resend.emails.send({
     from: 'Asset Management <assets@ihub-drishti.ai>',
     to: [to],
     subject: `Asset ${actionLabel === 'Out' ? 'Checked Out' : 'Checked In'} — Confirmation`,
     html,
 });
+
+// console.log("RESEND RESULT:", JSON.stringify(result, null, 2)); (for error checking in terminal)
+
+if (result.error) {
+    throw new Error(`Resend API error: ${JSON.stringify(result.error)}`);
+}
 }

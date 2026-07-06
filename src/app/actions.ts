@@ -146,6 +146,7 @@ const { messages, processed } = await prisma.$transaction(async (tx) => {
     });
 
     // --- SEND CONFIRMATION EMAIL (non-blocking) ---
+    // console.log("DEBUG: processed =", processed, "| emailAddress =", formData.emailAddress, "| API key present =", !!process.env.RESEND_API_KEY); (for error checking in terminal)
     if (processed.length > 0 && formData.emailAddress) {
       try {
         await sendConfirmationEmail({

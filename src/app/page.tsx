@@ -8,6 +8,8 @@ import { createBrowserClient } from '@supabase/ssr';
 import OverviewTable from "@/components/OverviewTable";
 import OverviewCardList from "@/components/OverviewCardList";
 import SearchableDropdown from "@/components/SearchableDropdown";
+import OverviewSkeleton from "@/components/OverviewSkeleton";
+
 
 type AssetData = { id: string; availableQuantity: number; totalQuantity: number };
 type Summary = { available: number; total: number };
@@ -266,7 +268,7 @@ export default function AssetManagementForm() {
 
             <div className="p-6 overflow-y-auto">
               {loadingOverview ? (
-                <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>
+                <OverviewSkeleton />
               ) : overviewData.length === 0 ? (
                 <div className="text-center py-10 text-gray-500">All assets are currently in the Almirah!</div>
               ) : (

@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma"
 import { Action } from "@prisma/client"
+import { sendConfirmationEmail } from "@/lib/email";
 
 export async function getUniqueAssetNames() {
   try {
@@ -91,12 +92,13 @@ export async function submitAssetLog(formData: {
     }
 
     // --- TRANSACTION ---
-    const results = await prisma.$transaction(async (tx) => {
-      let messages: string[] = [];
+const { messages, processed } = await prisma.$transaction(async (tx) => {
+      const messages: string[] = [];
+      const processed: { id: string; name: string }[] = [];
 
       for (const assetId of formData.assetIds) {
         const asset = await tx.asset.findUnique({ where: { id: assetId } });
-        
+
         if (!asset) {
           messages.push(`Asset ID ${assetId} not found.`);
           continue;
@@ -112,8 +114,8 @@ export async function submitAssetLog(formData: {
             data: { availableQuantity: asset.availableQuantity - 1 }
           });
           messages.push(`Asset ${assetId} checked out successfully.`);
-        } 
-        
+        }
+
         else if (formData.action === 'CHECK_IN') {
           if (asset.availableQuantity >= asset.totalQuantity) {
             messages.push(`EXPLOIT BLOCKED: Asset ${assetId} is already in the almirah!`);
@@ -136,13 +138,33 @@ export async function submitAssetLog(formData: {
             notes: formData.notes || "",
           }
         });
+
+        processed.push({ id: asset.id, name: asset.name });
       }
-      return messages;
+
+      return { messages, processed };
     });
 
-    const hasErrors = results.some((msg: string) => msg.includes('not found') || msg.includes('EXPLOIT'));
-    return { success: !hasErrors, message: results.join('\n') };
+    // --- SEND CONFIRMATION EMAIL (non-blocking) ---
+    // console.log("DEBUG: processed =", processed, "| emailAddress =", formData.emailAddress, "| API key present =", !!process.env.RESEND_API_KEY); (for error checking in terminal)
+    if (processed.length > 0 && formData.emailAddress) {
+      try {
+        await sendConfirmationEmail({
+          to: formData.emailAddress,
+          issuedTo: formData.issuedTo,
+          issuedBy: formData.issuedBy,
+          action: formData.action,
+          assets: processed,
+        });
+      } catch (emailError) {
+        console.error("Confirmation email failed (transaction still succeeded):", emailError);
+      }
+    }
 
+    const hasErrors = messages.some((msg: string) => msg.includes('not found') || msg.includes('EXPLOIT'));
+    return { success: !hasErrors, message: messages.join('\n') };
+
+    
   } catch (error) {
     console.error("Submission error:", error);
     return { success: false, message: "An unexpected error occurred during submission." };

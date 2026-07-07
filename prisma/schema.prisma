@@ -19,15 +19,17 @@ model Asset {
 }
 
 model Log {
-  id           String   @id @default(uuid())
-  assetId      String
-  action       Action
-  issuedBy     String
-  issuedTo     String
-  emailAddress String
-  notes        String?
-  createdAt    DateTime @default(now())
-  asset        Asset    @relation(fields: [assetId], references: [id])
+  id             String    @id @default(uuid())
+  assetId        String
+  action         Action
+  issuedBy       String
+  issuedTo       String
+  emailAddress   String
+  notes          String?
+  createdAt      DateTime  @default(now())
+  reminderSentAt DateTime?
+  escalatedAt    DateTime?
+  asset          Asset     @relation(fields: [assetId], references: [id])
 }
 
 enum Action {

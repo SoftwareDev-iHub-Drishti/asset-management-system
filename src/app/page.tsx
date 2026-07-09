@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { getUniqueAssetNames, getAssetDetailsByName, submitAssetLog, getCheckedOutAssets } from "./actions";
-import { Loader2, CheckCircle2, AlertCircle, FileText, X, ClipboardList } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, FileText, X, ClipboardList, Search } from "lucide-react";
 import Link from "next/link";
 import { createBrowserClient } from '@supabase/ssr';
 import OverviewTable from "@/components/OverviewTable";
@@ -37,6 +37,7 @@ export default function AssetManagementForm() {
   const [showOverview, setShowOverview] = useState(false);
   const [overviewData, setOverviewData] = useState<any[]>([]);
   const [loadingOverview, setLoadingOverview] = useState(false);
+  const [overviewSearchTerm, setOverviewSearchTerm] = useState("");
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -93,12 +94,29 @@ export default function AssetManagementForm() {
   const fetchOverview = async () => {
     setLoadingOverview(true);
     setShowOverview(true);
+    setOverviewSearchTerm("");
     const res = await getCheckedOutAssets();
     if (res.success && res.data) {
       setOverviewData(res.data);
     }
     setLoadingOverview(false);
   };
+
+  const filteredOverviewData = useMemo(() => {
+    const term = overviewSearchTerm.trim().toLowerCase();
+    if (!term) return overviewData;
+
+    return overviewData.filter((asset) => {
+      const lastLog = asset.logs[0];
+      return (
+        asset.id?.toLowerCase().includes(term) ||
+        asset.name?.toLowerCase().includes(term) ||
+        lastLog?.issuedTo?.toLowerCase().includes(term) ||
+        lastLog?.issuedBy?.toLowerCase().includes(term) ||
+        lastLog?.notes?.toLowerCase().includes(term)
+      );
+    });
+  }, [overviewData, overviewSearchTerm]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -247,6 +265,19 @@ export default function AssetManagementForm() {
               </div>
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1">
+                Notes <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="e.g. Took the iPhone only, charger left in the Almirah"
+                rows={2}
+                className="w-full p-2 border border-gray-300 rounded-md outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              />
+            </div>
+
             <button type="submit" disabled={status === "loading"} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-md transition-colors flex justify-center items-center gap-2">
               {status === "loading" ? <><Loader2 className="w-5 h-5 animate-spin" /> Processing...</> : "Submit Form"}
             </button>
@@ -266,15 +297,36 @@ export default function AssetManagementForm() {
               <button onClick={() => setShowOverview(false)} className="text-gray-500 hover:text-red-500"><X className="w-6 h-6" /></button>
             </div>
 
+            {!loadingOverview && overviewData.length > 0 && (
+              <div className="px-6 pt-4">
+                <div className="relative">
+                  <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={overviewSearchTerm}
+                    onChange={(e) => setOverviewSearchTerm(e.target.value)}
+                    placeholder="Search by asset name, ID, issued to/by, or notes..."
+                    className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="p-6 overflow-y-auto">
               {loadingOverview ? (
                 <OverviewSkeleton />
               ) : overviewData.length === 0 ? (
                 <div className="text-center py-10 text-gray-500">All assets are currently in the Almirah!</div>
+              ) : filteredOverviewData.length === 0 ? (
+                <div className="text-center py-10 text-gray-500">
+                  <Search className="w-10 h-10 mx-auto text-gray-300 mb-3" />
+                  <p className="font-medium text-gray-900">No matching assets</p>
+                  <p className="text-sm">Try a different search term.</p>
+                </div>
               ) : (
                 <>
-                  <OverviewTable overviewData={overviewData} />
-                  <OverviewCardList overviewData={overviewData} />
+                  <OverviewTable overviewData={filteredOverviewData} />
+                  <OverviewCardList overviewData={filteredOverviewData} />
                 </>
               )}
             </div>

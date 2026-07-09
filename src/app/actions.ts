@@ -155,6 +155,7 @@ const { messages, processed } = await prisma.$transaction(async (tx) => {
           issuedBy: formData.issuedBy,
           action: formData.action,
           assets: processed,
+          notes: formData.notes,
         });
       } catch (emailError) {
         console.error("Confirmation email failed (transaction still succeeded):", emailError);
